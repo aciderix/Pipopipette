@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pipopipette</title>
+  <!-- Google Fonts pour une typographie moderne -->
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Roboto', sans-serif;
+      background: #f2f2f2;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      color: #333;
+    }
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+    }
+    .controls {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      padding: 15px 20px;
+      margin-bottom: 20px;
+      width: 100%;
+      max-width: 400px;
+    }
+    .controls label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+    .controls input,
+    .controls select {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      margin-bottom: 15px;
+      font-size: 1rem;
+    }
+    .controls button {
+      width: 100%;
+      background: #2196F3;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 10px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    .controls button:hover {
+      background: #1976D2;
+    }
+    #score-board {
+      font-size: 1.2rem;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    /* Wrapper pour gérer le défilement sur mobile */
+    #grid-wrapper {
+      overflow: auto;
+      max-width: 100%;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background: #fff;
+      padding: 10px;
+    }
+    #game-container {
+      display: grid;
+      margin-top: 20px;
+      touch-action: manipulation; /* Améliore la réactivité tactile */
+    }
+    .dot {
+      width: 10px;
+      height: 10px;
+      background-color: #333;
+      border-radius: 50%;
+      justify-self: center;
+      align-self: center;
+    }
+    .line {
+      background-color: #e0e0e0;
+      cursor: pointer;
+      transition: background-color 0.5s ease; /* Animation fluide */
+    }
+    .line.played {
+      transition: background-color 0.5s ease;
+    }
+    .horizontal {
+      width: 30px;
+      height: 5px;
+    }
+    .vertical {
+      width: 5px;
+      height: 30px;
+    }
+    .box {
+      width: 30px;
+      height: 30px;
+      background-color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-weight: 500;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      transition: background-color 0.5s ease; /* Animation pour les boîtes */
+    }
+    /* Modal pour le tutoriel */
+    #modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      justify-content: center;
+      align-items: center;
+    }
+    #modal-content {
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      max-width: 500px;
+      text-align: center;
+    }
+    /* Adaptation mobile */
+    @media (max-width: 600px) {
+      .line.horizontal {
+        width: 20px;
+        height: 3px;
+      }
+      .line.vertical {
+        width: 3px;
+        height: 20px;
+      }
+      .dot {
+        width: 6px;
+        height: 6px;
+      }
+      .box {
+        width: 20px;
+        height: 20px;
+        font-size: 0.8rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Pipopipette</h1>
+  <div class="controls">
+    <label for="grid-size">Taille de la grille :</label>
+    <input type="number" id="grid-size" min="2" max="15" value="3">
+    <label for="game-mode">Mode de jeu :</label>
+    <select id="game-mode">
+      <option value="PvC">Humain vs Ordinateur</option>
+      <option value="PvP">Humain vs Humain</option>
+    </select>
+    <label for="difficulty">Difficulté de l'IA :</label>
+    <select id="difficulty">
+      <option value="easy">Facile</option>
+      <option value="medium">Moyen</option>
+      <option value="hard">Difficile</option>
+    </select>
+    <label for="player-color">Couleur du joueur :</label>
+    <input type="color" id="player-color" value="#2196F3">
+    <button id="start-game">Commencer le jeu</button>
+    <button id="how-to-play">Comment jouer</button>
+  </div>
+  <div id="score-board"></div>
+  <div id="grid-wrapper">
+    <div id="game-container"></div>
+  </div>
+  <div id="modal">
+    <div id="modal-content">
+      <h2>Comment jouer à Pipopipette</h2>
+      <p>Le but du jeu est de capturer le plus de boîtes possible en reliant les points. À chaque tour, un joueur trace une ligne entre deux points. Si une boîte est complétée, le joueur la capture et joue à nouveau. Le jeu se termine lorsque toutes les boîtes sont capturées.</p>
+      <button id="close-modal">Fermer</button>
+    </div>
+  </div>
+  <script>
+    /*** Variables globales ***/
+    const gameContainer = document.getElementById("game-container");
+    const gridSizeInput = document.getElementById("grid-size");
+    const modeSelect = document.getElementById("game-mode");
+    const difficultySelect = document.getElementById("difficulty");
+    const playerColorInput = document.getElementById("player-color");
+    const startGameButton = document.getElementById("start-game");
+    const howToPlayButton = document.getElementById("how-to-play");
+    const closeModalButton = document.getElementById("close-modal");
+    const modal = document.getElementById("modal");
+
+    let gridSize;
+    let grid = [];
+    let boxesClaimed = [];
+    let gameMode = "PvC";
+    let currentPlayer = "Player";
+    let difficulty = "medium";
+    let playerColor = "#2196F3";
+    let computerColor = "#f44336";
+    let player2Color = "#4CAF50";
+
+    // Sons (à remplacer par des fichiers réels)
+    const lineSound = new Audio('sounds/line.mp3');
+    const captureSound = new Audio('sounds/capture.mp3');
+
+    /*** Gestion des couleurs par joueur ***/
+    function getColorForPlayer(player) {
+      if (gameMode === "PvC") {
+        return (player === "Player") ? playerColor : computerColor;
+      } else {
+        return (player === "Player1") ? playerColor : player2Color;
+      }
+    }
+
+    /*** Écouteurs d'événements ***/
+    startGameButton.addEventListener("click", () => {
+      gridSize = parseInt(gridSizeInput.value);
+      gameMode = modeSelect.value;
+      difficulty = difficultySelect.value;
+      playerColor = playerColorInput.value;
+      currentPlayer = (gameMode === "PvC") ? "Player" : "Player1";
+      initGame(gridSize);
+      updateScoreboard();
+    });
+
+    howToPlayButton.addEventListener('click', () => {
+      modal.style.display = 'flex';
+    });
+
+    closeModalButton.addEventListener('click', () => {
+      modal.style.display = 'none';
+    });
+
+    /*** Initialisation du jeu ***/
+    function initGame(size) {
+      gameContainer.innerHTML = "";
+      gameContainer.style.gridTemplateColumns = `repeat(${2 * size + 1}, auto)`;
+      grid = [];
+      boxesClaimed = [];
+      for (let i = 0; i < size; i++) {
+        boxesClaimed.push(new Array(size).fill(null));
+      }
+      for (let r = 0; r < 2 * size + 1; r++) {
+        let rowArray = [];
+        for (let c = 0; c < 2 * size + 1; c++) {
+          const cell = document.createElement("div");
+          if (r % 2 === 0 && c % 2 === 0) {
+            cell.classList.add("dot");
+            rowArray.push("dot");
+          } else if (r % 2 === 0 && c % 2 === 1) {
+            cell.classList.add("line", "horizontal");
+            cell.dataset.row = r;
+            cell.dataset.col = c;
+            cell.addEventListener("click", handleHumanMove);
+            rowArray.push(null);
+          } else if (r % 2 === 1 && c % 2 === 0) {
+            cell.classList.add("line", "vertical");
+            cell.dataset.row = r;
+            cell.dataset.col = c;
+            cell.addEventListener("click", handleHumanMove);
+            rowArray.push(null);
+          } else {
+            cell.classList.add("box");
+            rowArray.push(null);
+          }
+          gameContainer.appendChild(cell);
+        }
+        grid.push(rowArray);
+      }
+    }
+
+    /*** Mise à jour du tableau des scores ***/
+    function updateScoreboard() {
+      let score = {};
+      if (gameMode === "PvC") {
+        score["Player"] = 0;
+        score["Computer"] = 0;
+      } else {
+        score["Player1"] = 0;
+        score["Player2"] = 0;
+      }
+      for (let i = 0; i < boxesClaimed.length; i++) {
+        for (let j = 0; j < boxesClaimed[i].length; j++) {
+          let owner = boxesClaimed[i][j];
+          if (owner !== null) {
+            score[owner] = (score[owner] || 0) + 1;
+          }
+        }
+      }
+      const scoreBoardDiv = document.getElementById("score-board");
+      if (gameMode === "PvC") {
+        scoreBoardDiv.innerHTML = `<p>Player: ${score["Player"]} point(s) | Computer: ${score["Computer"]} point(s)</p>`;
+      } else {
+        scoreBoardDiv.innerHTML = `<p>Player1: ${score["Player1"]} point(s) | Player2: ${score["Player2"]} point(s)</p>`;
+      }
+    }
+
+    /*** Vérification de la fin du jeu ***/
+    function areAllBoxesClaimed() {
+      return boxesClaimed.every(row => row.every(cell => cell !== null));
+    }
+
+    function checkGameOver() {
+      if (areAllBoxesClaimed()) {
+        let score = {};
+        if (gameMode === "PvC") {
+          score["Player"] = 0;
+          score["Computer"] = 0;
+        } else {
+          score["Player1"] = 0;
+          score["Player2"] = 0;
+        }
+        for (let i = 0; i < boxesClaimed.length; i++) {
+          for (let j = 0; j < boxesClaimed[i].length; j++) {
+            let owner = boxesClaimed[i][j];
+            if (owner !== null) {
+              score[owner] = (score[owner] || 0) + 1;
+            }
+          }
+        }
+        let message = "";
+        if (gameMode === "PvC") {
+          if (score["Player"] > score["Computer"]) {
+            message = "Game Over! Vous avez gagné !";
+          } else if (score["Player"] < score["Computer"]) {
+            message = "Game Over! L'ordinateur a gagné !";
+          } else {
+            message = "Game Over! Match nul !";
+          }
+        } else {
+          if (score["Player1"] > score["Player2"]) {
+            message = "Game Over! Player1 a gagné !";
+          } else if (score["Player1"] < score["Player2"]) {
+            message = "Game Over! Player2 a gagné !";
+          } else {
+            message = "Game Over! Match nul !";
+          }
+        }
+        alert(message);
+      }
+    }
+
+    /*** Gestion des coups humains ***/
+    function handleHumanMove(event) {
+      if (gameMode === "PvC" && currentPlayer !== "Player") return;
+      const cell = event.target;
+      const r = parseInt(cell.dataset.row);
+      const c = parseInt(cell.dataset.col);
+      if (grid[r][c] !== null) return;
+      markLine(r, c, currentPlayer);
+      lineSound.play();
+      let zoneCaptured = checkAndClaimEnclosedZones(currentPlayer);
+      if (zoneCaptured) {
+        captureSound.play();
+      }
+      if (!zoneCaptured) {
+        if (gameMode === "PvC") {
+          if (currentPlayer === "Player") {
+            currentPlayer = "Computer";
+            setTimeout(computerMove, 500);
+          } else {
+            currentPlayer = "Player";
+          }
+        } else {
+          currentPlayer = (currentPlayer === "Player1") ? "Player2" : "Player1";
+        }
+      }
+      updateScoreboard();
+      checkGameOver();
+    }
+
+    /*** Marquage d'une ligne ***/
+    function markLine(r, c, player) {
+      grid[r][c] = player;
+      const cell = gameContainer.children[r * (2 * gridSize + 1) + c];
+      cell.style.backgroundColor = getColorForPlayer(player);
+      cell.classList.add("played");
+      const newCell = cell.cloneNode(true);
+      gameContainer.replaceChild(newCell, cell);
+    }
+
+    /*** Vérification et capture des zones fermées ***/
+    function checkAndClaimEnclosedZones(player) {
+      let claimedAny = false;
+      let visited = Array(gridSize).fill().map(() => Array(gridSize).fill(false));
+      for (let i = 0; i < gridSize; i++) {
+        for (let j = 0; j < gridSize; j++) {
+          if (!visited[i][j]) {
+            let region = [];
+            let isOpen = false;
+            let stack = [{ i: i, j: j }];
+            while (stack.length > 0) {
+              let { i: ci, j: cj } = stack.pop();
+              if (visited[ci][cj]) continue;
+              visited[ci][cj] = true;
+              region.push({ i: ci, j: cj });
+              let r = 2 * ci + 1, c = 2 * cj + 1;
+              if (ci === 0 && grid[0][2 * cj + 1] === null) isOpen = true;
+              if (ci === gridSize - 1 && grid[2 * gridSize][2 * cj + 1] === null) isOpen = true;
+              if (cj === 0 && grid[2 * ci + 1][0] === null) isOpen = true;
+              if (cj === gridSize - 1 && grid[2 * ci + 1][2 * gridSize] === null) isOpen = true;
+              if (ci > 0 && grid[2 * ci][2 * cj + 1] === null && !visited[ci - 1][cj])
+                stack.push({ i: ci - 1, j: cj });
+              if (ci < gridSize - 1 && grid[2 * ci + 2][2 * cj + 1] === null && !visited[ci + 1][cj])
+                stack.push({ i: ci + 1, j: cj });
+              if (cj > 0 && grid[2 * ci + 1][2 * cj] === null && !visited[ci][cj - 1])
+                stack.push({ i: ci, j: cj - 1 });
+              if (cj < gridSize - 1 && grid[2 * ci + 1][2 * cj + 2] === null && !visited[ci][cj + 1])
+                stack.push({ i: ci, j: cj + 1 });
+            }
+            if (!isOpen) {
+              region.forEach(cell => {
+                let r = 2 * cell.i + 1;
+                let c = 2 * cell.j + 1;
+                let boxElem = gameContainer.children[r * (2 * gridSize + 1) + c];
+                if (boxesClaimed[cell.i][cell.j] === null) {
+                  boxesClaimed[cell.i][cell.j] = player;
+                  boxElem.dataset.claimed = player;
+                  boxElem.style.backgroundColor = getColorForPlayer(player);
+                  boxElem.textContent = (player === "Player" || player === "Player1") ? "P" : (player === "Player2" ? "2" : "C");
+                  claimedAny = true;
+                }
+              });
+            }
+          }
+        }
+      }
+      return claimedAny;
+    }
+
+    /*** Fonctions de simulation pour l'IA ***/
+    function cloneGrid(original) {
+      return original.map(row => row.slice());
+    }
+    function cloneBoxes(original) {
+      return original.map(row => row.slice());
+    }
+    function simulateEnclosedZones(simGrid, simBoxes, player) {
+      let claimedCount = 0;
+      let visited = Array(gridSize).fill().map(() => Array(gridSize).fill(false));
+      for (let i = 0; i < gridSize; i++) {
+        for (let j = 0; j < gridSize; j++) {
+          if (!visited[i][j]) {
+            let region = [];
+            let isOpen = false;
+            let stack = [{ i: i, j: j }];
+            while (stack.length > 0) {
+              let { i: ci, j: cj } = stack.pop();
+              if (visited[ci][cj]) continue;
+              visited[ci][cj] = true;
+              region.push({ i: ci, j: cj });
+              let r = 2 * ci + 1, c = 2 * cj + 1;
+              if (ci === 0 && simGrid[0][2 * cj + 1] === null) isOpen = true;
+              if (ci === gridSize - 1 && simGrid[2 * gridSize][2 * cj + 1] === null) isOpen = true;
+              if (cj === 0 && simGrid[2 * ci + 1][0] === null) isOpen = true;
+              if (cj === gridSize - 1 && simGrid[2 * ci + 1][2 * gridSize] === null) isOpen = true;
+              if (ci > 0 && simGrid[2 * ci][2 * cj + 1] === null && !visited[ci - 1][cj])
+                stack.push({ i: ci - 1, j: cj });
+              if (ci < gridSize - 1 && simGrid[2 * ci + 2][2 * cj + 1] === null && !visited[ci + 1][cj])
+                stack.push({ i: ci + 1, j: cj });
+              if (cj > 0 && simGrid[2 * ci + 1][2 * cj] === null && !visited[ci][cj - 1])
+                stack.push({ i: ci, j: cj - 1 });
+              if (cj < gridSize - 1 && simGrid[2 * ci + 1][2 * cj + 2] === null && !visited[ci][cj + 1])
+                stack.push({ i: ci, j: cj + 1 });
+            }
+            if (!isOpen) {
+              region.forEach(cell => {
+                if (simBoxes[cell.i][cell.j] === null) {
+                  simBoxes[cell.i][cell.j] = player;
+                  claimedCount++;
+                }
+              });
+            }
+          }
+        }
+      }
+      return claimedCount;
+    }
+    function simulateMoveYield(move, player) {
+      let simGrid = cloneGrid(grid);
+      let simBoxes = cloneBoxes(boxesClaimed);
+      simGrid[move.row][move.col] = player;
+      return simulateEnclosedZones(simGrid, simBoxes, player);
+    }
+    function getAllAvailableMoves() {
+      let moves = [];
+      for (let r = 0; r < grid.length; r++) {
+        for (let c = 0; c < grid[r].length; c++) {
+          if (grid[r][c] === null && ((r % 2 === 0 && c % 2 === 1) || (r % 2 === 1 && c % 2 === 0))) {
+            moves.push({ row: r, col: c });
+          }
+        }
+      }
+      return moves;
+    }
+
+    /*** Stratégie de l'IA ***/
+    function countSides(boxRow, boxCol, extraMove) {
+      let count = 0;
+      const sides = [
+        { r: boxRow - 1, c: boxCol },
+        { r: boxRow + 1, c: boxCol },
+        { r: boxRow, c: boxCol - 1 },
+        { r: boxRow, c: boxCol + 1 }
+      ];
+      for (let side of sides) {
+        if (side.r === extraMove.row && side.c === extraMove.col) {
+          count++;
+        } else if (grid[side.r][side.c] !== null) {
+          count++;
+        }
+      }
+      return count;
+    }
+    function wouldCompleteBox(move) {
+      let completes = false;
+      if (move.row % 2 === 0) {
+        if (move.row > 0) {
+          let boxRow = move.row - 1;
+          let boxCol = move.col;
+          if (boxRow % 2 === 1 && boxCol % 2 === 1 && countSides(boxRow, boxCol, move) === 4)
+            completes = true;
+        }
+        if (move.row < 2 * gridSize) {
+          let boxRow = move.row + 1;
+          let boxCol = move.col;
+          if (boxRow % 2 === 1 && boxCol % 2 === 1 && countSides(boxRow, boxCol, move) === 4)
+            completes = true;
+        }
+      } else {
+        if (move.col > 0) {
+          let boxRow = move.row;
+          let boxCol = move.col - 1;
+          if (boxRow % 2 === 1 && boxCol % 2 === 1 && countSides(boxRow, boxCol, move) === 4)
+            completes = true;
+        }
+        if (move.col < 2 * gridSize) {
+          let boxRow = move.row;
+          let boxCol = move.col + 1;
+          if (boxRow % 2 === 1 && boxCol % 2 === 1 && countSides(boxRow, boxCol, move) === 4)
+            completes = true;
+        }
+      }
+      return completes;
+    }
+    function riskCount(move) {
+      let risk = 0;
+      let adjacentBoxes = [];
+      if (move.row % 2 === 0) {
+        if (move.row > 0) adjacentBoxes.push({ r: move.row - 1, c: move.col });
+        if (move.row < 2 * gridSize) adjacentBoxes.push({ r: move.row + 1, c: move.col });
+      } else {
+        if (move.col > 0) adjacentBoxes.push({ r: move.row, c: move.col - 1 });
+        if (move.col < 2 * gridSize) adjacentBoxes.push({ r: move.row, c: move.col + 1 });
+      }
+      for (let box of adjacentBoxes) {
+        if (box.r % 2 === 1 && box.c % 2 === 1) {
+          let boxElem = gameContainer.children[box.r * (2 * gridSize + 1) + box.c];
+          if (boxElem.dataset.claimed) continue;
+          let count = countSides(box.r, box.c, move);
+          if (count === 3) risk++;
+        }
+      }
+      return risk;
+    }
+    function getComputerMove() {
+      const availableMoves = getAllAvailableMoves();
+      if (difficulty === "easy") {
+        return availableMoves[Math.floor(Math.random() * availableMoves.length)];
+      } else if (difficulty === "medium") {
+        let bestMove = null;
+        let bestYield = -1;
+        for (let move of availableMoves) {
+          let yieldCount = simulateMoveYield(move, "Computer");
+          if (yieldCount > bestYield) {
+            bestYield = yieldCount;
+            bestMove = move;
+          }
+        }
+        if (bestYield > 0) return bestMove;
+        let winningMoves = [];
+        let safeMoves = [];
+        let riskyMoves = [];
+        for (let move of availableMoves) {
+          if (wouldCompleteBox(move)) {
+            winningMoves.push(move);
+          } else {
+            const risk = riskCount(move);
+            if (risk === 0) safeMoves.push(move);
+            else riskyMoves.push(move);
+          }
+        }
+        if (winningMoves.length > 0) return winningMoves[Math.floor(Math.random() * winningMoves.length)];
+        if (safeMoves.length > 0) return safeMoves[Math.floor(Math.random() * safeMoves.length)];
+        if (riskyMoves.length > 0) return riskyMoves[Math.floor(Math.random() * riskyMoves.length)];
+        return availableMoves[Math.floor(Math.random() * availableMoves.length)];
+      } else {
+        // Niveau difficile : placeholder pour Minimax (non implémenté ici)
+        return availableMoves[Math.floor(Math.random() * availableMoves.length)];
+      }
+    }
+    function computerMove() {
+      if (currentPlayer !== "Computer") return;
+      const move = getComputerMove();
+      if (!move) return;
+      markLine(move.row, move.col, "Computer");
+      lineSound.play();
+      let zoneCaptured = checkAndClaimEnclosedZones("Computer");
+      if (zoneCaptured) captureSound.play();
+      updateScoreboard();
+      if (areAllBoxesClaimed()) {
+        checkGameOver();
+        return;
+      }
+      if (!zoneCaptured) currentPlayer = "Player";
+      else setTimeout(computerMove, 500);
+    }
+  </script>
+</body>
+</html>
